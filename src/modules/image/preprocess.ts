@@ -1,4 +1,5 @@
-import sharp from 'sharp';
+import sharp from "sharp";
+import { PreprocessedImage } from "../../types/image.js"; 
 
 export async function preprocessImage(
   imagePath: string
@@ -8,8 +9,8 @@ export async function preprocessImage(
 
   const processedBuffer = await image
     .resize(256, 256)
-    .blur(1) // noise reduction
-    .normalise() // lighting normalization
+    .blur(1)
+    .normalise()
     .toBuffer();
 
   return {
