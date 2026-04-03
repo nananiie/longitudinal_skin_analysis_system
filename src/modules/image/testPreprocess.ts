@@ -1,23 +1,30 @@
-import fs from "fs";
+import { preprocessImage } from "./preprocess";
+import { extractFeatures } from "./featureExtraction";
 import path from "path";
-import { preprocessImage } from "./preprocess.js"; 
-import { fileURLToPath } from "url";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+async function runTest() {
+  const samplePath = path.resolve("uploads/test/allie_forehead_wof_sample.jpg");
 
-async function test() {
-  const imagePath = path.join(
-  __dirname,
-  "../../../uploads/test/will_forehead_wof_sample.jpg" 
-);
+  console.log("--- PIXELDERM: DAMAGE IDENTIFICATION PROFILE ---");
+  
+  try {
+    // 1. Preprocess
+    const imgData = await preprocessImage(samplePath);
+    
+    // 2. Extract Features using your interface
+    imgData.features = await extractFeatures(imgData.buffer);
 
-  const result = await preprocessImage(imagePath);
+    // 3. Output identifying damage
+    console.log(`Identification results for ${path.basename(samplePath)}:`);
+    console.log(`- Spot Count: ${imgData.features.spotCount}`);
+    console.log(`- Texture Score: ${imgData.features.textureScore.toFixed(2)}`);
+    console.log(`- Pigmentation Density: ${(imgData.features.averagePigmentation * 100).toFixed(2)}%`);
+    
+    console.log("\n----------------------------");
 
-  fs.writeFileSync("debug_preprocessed.jpg", result.buffer);
-
-  console.log("Preprocess test successful");
-  console.log(`Image size: ${result.width} x ${result.height}`);
+  } catch (error) {
+    console.error("X Pipeline Error:", error);
+  }
 }
 
-test().catch(console.error);
+runTest();
