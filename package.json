@@ -1,0 +1,26 @@
+{
+  "name": "longitudinal-skin-analysis-system",
+  "version": "1.0.0",
+  "description": "Longitudinal skin analysis system for desktop and Android",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsc --watch"
+  },
+  "keywords": [
+    "skin-analysis",
+    "image-processing",
+    "machine-learning"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "sharp": "^0.34.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

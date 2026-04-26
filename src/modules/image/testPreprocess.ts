@@ -1,10 +1,11 @@
+/// <reference types="node" />
 import { preprocessImage } from "./preprocess";
 import { extractFeatures } from "./featureExtraction";
 import path from "path";
 
 async function runTest() {
   const samplePath = path.resolve("uploads/test/allie_forehead_wof_sample.jpg");
-
+  
   console.log("--- PIXELDERM: DAMAGE IDENTIFICATION PROFILE ---");
   
   try {

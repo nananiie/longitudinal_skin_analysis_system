@@ -8,8 +8,8 @@ export async function extractFeatures(buffer: Buffer): Promise<FeatureResults> {
     for (let i = 0; i < buffer.length; i++) {
         const pixel = buffer[i];
         
-        // to identify spots/hyperpigmentation - ADAPTIVE THRESHOLDING
-        if (pixel < threshold) spotPixels++;
+        // to identify spots/hyperpigmentation - ADAPTIVE THRESHOLDING ++ to detect moles for early detection of skin cancer
+        if (pixel < threshold) spotPixels++; //[DIMENSION] move 'spotPixels++' below then add another variable called 'spotMole++' ; spotMole++ if pixelSize > 6mm
 
         // to identify texture variance - LOCAL BINARY PATTERNS 
         if (i > 0) textureVariance += Math.abs(buffer[i] - buffer[i - 1]);
