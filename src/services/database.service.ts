@@ -142,7 +142,7 @@ export class AnalysisDatabase {
       user_id: userId,
       body_area: bodyArea as any,
       session_date: now,
-      lighting_condition,
+      lighting_condition: lightingCondition,
       notes
     };
   }
@@ -193,7 +193,8 @@ export class AnalysisDatabase {
       image_path: imagePath,
       width,
       height,
-      created_at: now
+      created_at: now,
+      stored_locally: true
     };
   }
 
