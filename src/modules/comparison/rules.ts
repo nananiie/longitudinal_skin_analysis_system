@@ -15,5 +15,5 @@ export function generateRecommendation(current: FeatureResults, baseline: Featur
         advice = "High spot density detected. Please consult a dermatologist for a professional exam.";
     }
 
-    return { status, advice };
+    return { status, advice }; // TITE TITTE TTIITEIEIEIEIEIEIRE kita mo ba
 }
