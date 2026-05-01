@@ -9,6 +9,10 @@ import Database from 'better-sqlite3';
 import { v4 as uuidv4 } from 'uuid';
 import * as fs from 'fs';
 import * as path from 'path';
+import { fileURLToPath } from 'url'; // <--- ADD THIS
+// --- ADD THESE TWO LINES ---
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 /**
  * AnalysisDatabase - Main database service for historical data management
  */
@@ -25,7 +29,7 @@ export class AnalysisDatabase {
      */
     async initialize() {
         try {
-            const schemaPath = path.resolve(__dirname, '../database/db-schema.sql');
+            const schemaPath = path.resolve(__dirname, '../../db-schema.sql');
             const schema = fs.readFileSync(schemaPath, 'utf-8');
             // Execute schema - use exec() for multiple statements
             this.db.exec(schema);

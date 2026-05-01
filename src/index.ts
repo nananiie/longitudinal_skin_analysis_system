@@ -26,7 +26,7 @@ let db: AnalysisDatabase;
 /**
  * Initialize Express server
  */
-function createServer() {
+function createServer(database: AnalysisDatabase) {
   const app = express();
 
   // Middleware
@@ -37,13 +37,16 @@ function createServer() {
   // Static files
   app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
+  // Attach database before routes so req.db is available in all handlers
+  app.use((req: any, _res, next) => { req.db = database; next(); });
+
   // Health check
   app.get('/health', (req, res) => {
     res.json({
       status: 'healthy',
       timestamp: new Date().toISOString(),
       environment: NODE_ENV,
-      database: db ? 'connected' : 'disconnected'
+      database: database ? 'connected' : 'disconnected'
     });
   });
 
@@ -105,14 +108,8 @@ async function start() {
     // Initialize database
     await initializeDatabase();
 
-    // Create Express app
-    const app = createServer();
-
-    // Attach database to request context
-    app.use((req: any, res, next) => {
-      req.db = db;
-      next();
-    });
+    // Create Express app with database attached
+    const app = createServer(db);
 
     // Start server
     const server = app.listen(PORT, () => {
@@ -148,7 +145,7 @@ async function start() {
 }
 
 // Export for testing
-export const getApp = () => createServer;
+export const getApp = (database: AnalysisDatabase) => createServer(database);
 export const getDb = () => db;
 
 // Start if run directly

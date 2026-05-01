@@ -44,7 +44,7 @@ export async function analyzeAndStoreExample(db, userId, imagePath) {
         console.log('✓ Session created:', session.session_id);
         // Step 2: Process image
         const preprocessed = await preprocessImage(imagePath);
-        const features = await extractFeatures(preprocessed.buffer);
+        const features = await extractFeatures(preprocessed.buffer, preprocessed.width, preprocessed.height);
         // Step 3: Store image metadata
         const imageHash = crypto
             .createHash('sha256')

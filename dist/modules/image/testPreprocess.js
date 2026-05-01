@@ -9,7 +9,7 @@ async function runTest() {
         // 1. Preprocess
         const imgData = await preprocessImage(samplePath);
         // 2. Extract Features using your interface
-        imgData.features = await extractFeatures(imgData.buffer);
+        imgData.features = await extractFeatures(imgData.buffer, imgData.width, imgData.height);
         // 3. Output identifying damage
         console.log(`Identification results for ${path.basename(samplePath)}:`);
         console.log(`- Spot Count: ${imgData.features.spotCount}`);
@@ -21,5 +21,5 @@ async function runTest() {
         console.error("X Pipeline Error:", error);
     }
 }
-runTest();
+//runTest();
 //# sourceMappingURL=testPreprocess.js.map

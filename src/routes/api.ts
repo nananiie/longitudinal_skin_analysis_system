@@ -10,11 +10,29 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import multer from 'multer';
 
 import { AnalysisDatabase } from '../services/database.service.js';
 import { preprocessImage } from '../modules/image/preprocess.js';
 import { extractFeatures } from '../modules/image/featureExtraction.js';
 import { generateRecommendation } from '../modules/comparison/rules.js';
+
+// Multer — save uploads to /uploads with original extension
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, path.join(__dirname, '../../uploads')),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname) || '.jpg';
+    cb(null, `${Date.now()}-${crypto.randomUUID()}${ext}`);
+  },
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Only image files are allowed'));
+  },
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -84,6 +102,55 @@ router.post('/users', (req: Request, res: Response) => {
 // ============================================================================
 
 /**
+ * POST /api/analyze/upload
+ * Mobile-friendly endpoint: accepts multipart/form-data with an image file.
+ * Fields: image (file), userId (string), bodyArea (string), lightingCondition? (string)
+ */
+router.post('/analyze/upload', upload.single('image'), async (req: Request, res: Response) => {
+  try {
+    const { userId, bodyArea = 'forehead', lightingCondition = 'natural', notes } = req.body;
+    const db = req.db!;
+
+    if (!userId) return res.status(400).json({ error: 'userId required' });
+    if (!req.file) return res.status(400).json({ error: 'image file required' });
+
+    const imagePath = req.file.path;
+
+    // Reuse the full analysis pipeline
+    const session = db.createSession(userId, bodyArea as any, lightingCondition, notes);
+    const preprocessed = await preprocessImage(imagePath);
+    const features = await extractFeatures(preprocessed.buffer, preprocessed.width, preprocessed.height);
+
+    const imageHash = crypto.createHash('sha256').update(preprocessed.buffer).digest('hex');
+    const image = db.createImageRecord(session.session_id, userId, imagePath, preprocessed.width, preprocessed.height, imageHash);
+    const analysis = db.createAnalysis(image.image_id, session.session_id, userId, features.spotCount, features.textureScore, features.averagePigmentation, undefined, 0.95, 'v1.0');
+
+    let baseline = db.getActiveBaseline(userId, bodyArea);
+    if (!baseline) {
+      baseline = db.setBaseline(userId, bodyArea, analysis.analysis_id, session.session_id, features.spotCount, features.textureScore, features.averagePigmentation);
+    }
+
+    const recommendation = generateRecommendation(features, baseline ? {
+      spotCount: baseline.baseline_spot_count,
+      textureScore: baseline.baseline_texture_score,
+      averagePigmentation: baseline.baseline_pigmentation,
+    } : null);
+
+    const rec = db.createRecommendation(userId, analysis.analysis_id, session.session_id, recommendation.status as any, recommendation.advice);
+
+    res.status(201).json({
+      success: true,
+      analysis: { analysisId: analysis.analysis_id, sessionId: session.session_id, imageId: image.image_id, timestamp: analysis.analysis_timestamp },
+      features: { spotCount: features.spotCount, textureScore: Number(features.textureScore.toFixed(3)), pigmentation: Number(features.averagePigmentation.toFixed(3)) },
+      baseline: baseline ? { spotCount: baseline.baseline_spot_count, textureScore: Number(baseline.baseline_texture_score.toFixed(3)), pigmentation: Number(baseline.baseline_pigmentation.toFixed(3)) } : null,
+      recommendation: { status: recommendation.status, advice: recommendation.advice, recommendationId: rec.recommendation_id },
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
  * POST /api/analyze
  * Main endpoint: Upload image → Preprocess → Extract Features → Store → Get Recommendation
  * 
@@ -120,7 +187,7 @@ router.post('/analyze', async (req: Request, res: Response) => {
     console.log(`  ✓ Image preprocessed: 256x256`);
 
     // STEP 3: Extract features (spot count, texture, pigmentation)
-    const features = await extractFeatures(preprocessed.buffer);
+    const features = await extractFeatures(preprocessed.buffer, preprocessed.width, preprocessed.height);
     console.log(`  ✓ Features extracted: ${features.spotCount} spots, texture: ${features.textureScore.toFixed(2)}`);
 
     // STEP 4: Store image metadata

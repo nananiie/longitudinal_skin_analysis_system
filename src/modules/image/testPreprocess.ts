@@ -13,7 +13,7 @@ async function runTest() {
     const imgData = await preprocessImage(samplePath);
     
     // 2. Extract Features using your interface
-    imgData.features = await extractFeatures(imgData.buffer);
+    imgData.features = await extractFeatures(imgData.buffer, imgData.width, imgData.height);
 
     // 3. Output identifying damage
     console.log(`Identification results for ${path.basename(samplePath)}:`);

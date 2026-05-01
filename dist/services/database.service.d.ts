@@ -1,10 +1,3 @@
-/**
- * SQLite Database Service
- * Portable data access layer for skin analysis historical data
- *
- * Works with both Node.js (desktop) and future Android implementation
- * Uses prepared statements for platform independence
- */
 import { User, AnalysisSession, ImageMetadata, FeatureAnalysisResult, BaselineReference, Recommendation, HistoricalRecord, TrendData, AnalysisQueryFilter, ComparisonResult, DatabaseConfig } from '../types/database.types.js';
 /**
  * AnalysisDatabase - Main database service for historical data management
