@@ -6,6 +6,8 @@ export async function preprocessImage(imagePath) {
         .resize(256, 256)
         .blur(1)
         .normalise()
+        .grayscale()
+        .raw()
         .toBuffer();
     return {
         buffer: processedBuffer,

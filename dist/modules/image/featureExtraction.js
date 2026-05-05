@@ -1,11 +1,57 @@
-export async function extractFeatures(buffer, width, height) {
-    let textureVariance = 0;
-    const threshold = 100;
-    // 1. Texture Analysis (1D Gradient Approximation of LBP)
-    for (let i = 1; i < buffer.length; i++) {
-        textureVariance += Math.abs(buffer[i] - buffer[i - 1]);
+// Otsu's method: finds the intensity threshold that maximises between-class variance
+function computeOtsuThreshold(buffer) {
+    const histogram = new Int32Array(256);
+    for (let i = 0; i < buffer.length; i++)
+        histogram[buffer[i]]++;
+    const total = buffer.length;
+    let sum = 0;
+    for (let i = 0; i < 256; i++)
+        sum += i * histogram[i];
+    let sumB = 0, wB = 0, maxVariance = 0, threshold = 0;
+    for (let t = 0; t < 256; t++) {
+        wB += histogram[t];
+        if (wB === 0)
+            continue;
+        const wF = total - wB;
+        if (wF === 0)
+            break;
+        sumB += t * histogram[t];
+        const mB = sumB / wB;
+        const mF = (sum - sumB) / wF;
+        const variance = wB * wF * (mB - mF) ** 2;
+        if (variance > maxVariance) {
+            maxVariance = variance;
+            threshold = t;
+        }
     }
-    // 2. Connected Components Labeling (CCL) via Depth-First Search
+    return threshold;
+}
+// 8-neighbour Local Binary Pattern: encodes local texture as a binary code per pixel
+function computeLBPScore(buffer, width, height) {
+    // Clockwise from right: E, SE, S, SW, W, NW, N, NE
+    const offsets = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]];
+    let lbpSum = 0;
+    const pixelCount = (width - 2) * (height - 2);
+    for (let y = 1; y < height - 1; y++) {
+        for (let x = 1; x < width - 1; x++) {
+            const center = buffer[y * width + x];
+            let code = 0;
+            for (let b = 0; b < 8; b++) {
+                const [dx, dy] = offsets[b];
+                if (buffer[(y + dy) * width + (x + dx)] >= center)
+                    code |= (1 << b);
+            }
+            lbpSum += code;
+        }
+    }
+    return (lbpSum / pixelCount) / 255; // normalised to 0–1
+}
+export async function extractFeatures(buffer, width, height) {
+    // 1. Adaptive Thresholding via Otsu's method
+    const threshold = computeOtsuThreshold(buffer);
+    // 2. Texture Analysis via 8-neighbour Local Binary Pattern
+    const textureScore = computeLBPScore(buffer, width, height);
+    // 3. Connected Components Labeling (CCL) via Depth-First Search
     let totalSpotPixels = 0;
     let validSpotsCount = 0;
     const visited = new Uint8Array(buffer.length);
@@ -49,7 +95,7 @@ export async function extractFeatures(buffer, width, height) {
     }
     return {
         spotCount: validSpotsCount,
-        textureScore: textureVariance / buffer.length,
+        textureScore,
         averagePigmentation: totalSpotPixels / buffer.length
     };
 }

@@ -13,9 +13,10 @@ import crypto from 'crypto';
 import multer from 'multer';
 
 import { AnalysisDatabase } from '../services/database.service.js';
-import { preprocessImage } from '../modules/image/preprocess.js';
+import { preprocessImage, isSkinImage } from '../modules/image/preprocess.js';
 import { extractFeatures } from '../modules/image/featureExtraction.js';
 import { generateRecommendation } from '../modules/comparison/rules.js';
+import { sendToAIEngine } from '../modules/ml/apiClient.js';
 
 // Multer — save uploads to /uploads with original extension
 const storage = multer.diskStorage({
@@ -116,6 +117,12 @@ router.post('/analyze/upload', upload.single('image'), async (req: Request, res:
 
     const imagePath = req.file.path;
 
+    const skinDetected = await isSkinImage(imagePath);
+    if (!skinDetected) {
+      fs.unlinkSync(imagePath);
+      return res.status(400).json({ error: 'Image does not appear to be skin. Please retake the photo directly on the skin area.' });
+    }
+
     // Reuse the full analysis pipeline
     const session = db.createSession(userId, bodyArea as any, lightingCondition, notes);
     const preprocessed = await preprocessImage(imagePath);
@@ -138,12 +145,15 @@ router.post('/analyze/upload', upload.single('image'), async (req: Request, res:
 
     const rec = db.createRecommendation(userId, analysis.analysis_id, session.session_id, recommendation.status as any, recommendation.advice);
 
+    const aiResult = await sendToAIEngine(userId, features);
+
     res.status(201).json({
       success: true,
       analysis: { analysisId: analysis.analysis_id, sessionId: session.session_id, imageId: image.image_id, timestamp: analysis.analysis_timestamp },
       features: { spotCount: features.spotCount, textureScore: Number(features.textureScore.toFixed(3)), pigmentation: Number(features.averagePigmentation.toFixed(3)) },
       baseline: baseline ? { spotCount: baseline.baseline_spot_count, textureScore: Number(baseline.baseline_texture_score.toFixed(3)), pigmentation: Number(baseline.baseline_pigmentation.toFixed(3)) } : null,
       recommendation: { status: recommendation.status, advice: recommendation.advice, recommendationId: rec.recommendation_id },
+      ...(aiResult && { uvDamage: { damageScore: aiResult.damage_score, level: aiResult.level, advice: aiResult.advice } }),
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -253,7 +263,11 @@ router.post('/analyze', async (req: Request, res: Response) => {
       recommendation.advice
     );
 
-    // STEP 9: Return full result
+    // STEP 9: Random Forest inference (Python service — non-blocking, fails gracefully)
+    const aiResult = await sendToAIEngine(userId, features);
+    if (aiResult) console.log(`  ✓ RF damage score: ${aiResult.damage_score} (${aiResult.level})`);
+
+    // STEP 10: Return full result
     res.status(201).json({
       success: true,
       analysis: {
@@ -277,7 +291,8 @@ router.post('/analyze', async (req: Request, res: Response) => {
         status: recommendation.status,
         advice: recommendation.advice,
         recommendationId: rec.recommendation_id
-      }
+      },
+      ...(aiResult && { uvDamage: { damageScore: aiResult.damage_score, level: aiResult.level, advice: aiResult.advice } }),
     });
 
   } catch (error: any) {

@@ -13,6 +13,7 @@ import multer from 'multer';
 import { preprocessImage } from '../modules/image/preprocess.js';
 import { extractFeatures } from '../modules/image/featureExtraction.js';
 import { generateRecommendation } from '../modules/comparison/rules.js';
+import { sendToAIEngine } from '../modules/ml/apiClient.js';
 // Multer — save uploads to /uploads with original extension
 const storage = multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, path.join(__dirname, '../../uploads')),
@@ -112,12 +113,14 @@ router.post('/analyze/upload', upload.single('image'), async (req, res) => {
             averagePigmentation: baseline.baseline_pigmentation,
         } : null);
         const rec = db.createRecommendation(userId, analysis.analysis_id, session.session_id, recommendation.status, recommendation.advice);
+        const aiResult = await sendToAIEngine(userId, features);
         res.status(201).json({
             success: true,
             analysis: { analysisId: analysis.analysis_id, sessionId: session.session_id, imageId: image.image_id, timestamp: analysis.analysis_timestamp },
             features: { spotCount: features.spotCount, textureScore: Number(features.textureScore.toFixed(3)), pigmentation: Number(features.averagePigmentation.toFixed(3)) },
             baseline: baseline ? { spotCount: baseline.baseline_spot_count, textureScore: Number(baseline.baseline_texture_score.toFixed(3)), pigmentation: Number(baseline.baseline_pigmentation.toFixed(3)) } : null,
             recommendation: { status: recommendation.status, advice: recommendation.advice, recommendationId: rec.recommendation_id },
+            ...(aiResult && { uvDamage: { damageScore: aiResult.damage_score, level: aiResult.level, advice: aiResult.advice } }),
         });
     }
     catch (error) {
@@ -184,7 +187,11 @@ router.post('/analyze', async (req, res) => {
         console.log(`  ✓ Recommendation: ${recommendation.status}`);
         // STEP 8: Store recommendation in database
         const rec = db.createRecommendation(userId, analysis.analysis_id, session.session_id, recommendation.status, recommendation.advice);
-        // STEP 9: Return full result
+        // STEP 9: Random Forest inference (Python service — non-blocking, fails gracefully)
+        const aiResult = await sendToAIEngine(userId, features);
+        if (aiResult)
+            console.log(`  ✓ RF damage score: ${aiResult.damage_score} (${aiResult.level})`);
+        // STEP 10: Return full result
         res.status(201).json({
             success: true,
             analysis: {
@@ -208,7 +215,8 @@ router.post('/analyze', async (req, res) => {
                 status: recommendation.status,
                 advice: recommendation.advice,
                 recommendationId: rec.recommendation_id
-            }
+            },
+            ...(aiResult && { uvDamage: { damageScore: aiResult.damage_score, level: aiResult.level, advice: aiResult.advice } }),
         });
     }
     catch (error) {
