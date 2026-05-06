@@ -10,10 +10,11 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import multer from 'multer';
-import { preprocessImage } from '../modules/image/preprocess.js';
+import { preprocessImage, isSkinImage } from '../modules/image/preprocess.js';
 import { extractFeatures } from '../modules/image/featureExtraction.js';
 import { generateRecommendation } from '../modules/comparison/rules.js';
 import { sendToAIEngine } from '../modules/ml/apiClient.js';
+import { getGeminiRecommendation } from '../services/gemini.service.js';
 // Multer — save uploads to /uploads with original extension
 const storage = multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, path.join(__dirname, '../../uploads')),
@@ -96,6 +97,11 @@ router.post('/analyze/upload', upload.single('image'), async (req, res) => {
         if (!req.file)
             return res.status(400).json({ error: 'image file required' });
         const imagePath = req.file.path;
+        const skinDetected = await isSkinImage(imagePath);
+        if (!skinDetected) {
+            fs.unlinkSync(imagePath);
+            return res.status(400).json({ error: 'Image does not appear to be skin. Please retake the photo directly on the skin area.' });
+        }
         // Reuse the full analysis pipeline
         const session = db.createSession(userId, bodyArea, lightingCondition, notes);
         const preprocessed = await preprocessImage(imagePath);
@@ -114,6 +120,20 @@ router.post('/analyze/upload', upload.single('image'), async (req, res) => {
         } : null);
         const rec = db.createRecommendation(userId, analysis.analysis_id, session.session_id, recommendation.status, recommendation.advice);
         const aiResult = await sendToAIEngine(userId, features);
+        const geminiRecommendation = await getGeminiRecommendation({
+            features,
+            baseline: baseline ? {
+                spotCount: baseline.baseline_spot_count,
+                textureScore: baseline.baseline_texture_score,
+                averagePigmentation: baseline.baseline_pigmentation,
+            } : null,
+            ruleStatus: recommendation.status,
+            ruleAdvice: recommendation.advice,
+            damageScore: aiResult?.damage_score,
+            damageLevel: aiResult?.level,
+            damageAdvice: aiResult?.advice,
+            bodyArea,
+        });
         res.status(201).json({
             success: true,
             analysis: { analysisId: analysis.analysis_id, sessionId: session.session_id, imageId: image.image_id, timestamp: analysis.analysis_timestamp },
@@ -121,6 +141,7 @@ router.post('/analyze/upload', upload.single('image'), async (req, res) => {
             baseline: baseline ? { spotCount: baseline.baseline_spot_count, textureScore: Number(baseline.baseline_texture_score.toFixed(3)), pigmentation: Number(baseline.baseline_pigmentation.toFixed(3)) } : null,
             recommendation: { status: recommendation.status, advice: recommendation.advice, recommendationId: rec.recommendation_id },
             ...(aiResult && { uvDamage: { damageScore: aiResult.damage_score, level: aiResult.level, advice: aiResult.advice } }),
+            ...(geminiRecommendation && { geminiRecommendation }),
         });
     }
     catch (error) {
@@ -191,7 +212,24 @@ router.post('/analyze', async (req, res) => {
         const aiResult = await sendToAIEngine(userId, features);
         if (aiResult)
             console.log(`  ✓ RF damage score: ${aiResult.damage_score} (${aiResult.level})`);
-        // STEP 10: Return full result
+        // STEP 10: Gemini AI personalized recommendation
+        const geminiRecommendation = await getGeminiRecommendation({
+            features,
+            baseline: baseline ? {
+                spotCount: baseline.baseline_spot_count,
+                textureScore: baseline.baseline_texture_score,
+                averagePigmentation: baseline.baseline_pigmentation,
+            } : null,
+            ruleStatus: recommendation.status,
+            ruleAdvice: recommendation.advice,
+            damageScore: aiResult?.damage_score,
+            damageLevel: aiResult?.level,
+            damageAdvice: aiResult?.advice,
+            bodyArea,
+        });
+        if (geminiRecommendation)
+            console.log(`  ✓ Gemini recommendation generated`);
+        // STEP 11: Return full result
         res.status(201).json({
             success: true,
             analysis: {
@@ -217,6 +255,7 @@ router.post('/analyze', async (req, res) => {
                 recommendationId: rec.recommendation_id
             },
             ...(aiResult && { uvDamage: { damageScore: aiResult.damage_score, level: aiResult.level, advice: aiResult.advice } }),
+            ...(geminiRecommendation && { geminiRecommendation }),
         });
     }
     catch (error) {

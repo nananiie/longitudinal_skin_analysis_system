@@ -17,6 +17,7 @@ import { preprocessImage, isSkinImage } from '../modules/image/preprocess.js';
 import { extractFeatures } from '../modules/image/featureExtraction.js';
 import { generateRecommendation } from '../modules/comparison/rules.js';
 import { sendToAIEngine } from '../modules/ml/apiClient.js';
+import { getGeminiRecommendation } from '../services/gemini.service.js';
 
 // Multer — save uploads to /uploads with original extension
 const storage = multer.diskStorage({
@@ -147,6 +148,21 @@ router.post('/analyze/upload', upload.single('image'), async (req: Request, res:
 
     const aiResult = await sendToAIEngine(userId, features);
 
+    const geminiRecommendation = await getGeminiRecommendation({
+      features,
+      baseline: baseline ? {
+        spotCount: baseline.baseline_spot_count,
+        textureScore: baseline.baseline_texture_score,
+        averagePigmentation: baseline.baseline_pigmentation,
+      } : null,
+      ruleStatus: recommendation.status,
+      ruleAdvice: recommendation.advice,
+      damageScore: aiResult?.damage_score,
+      damageLevel: aiResult?.level,
+      damageAdvice: aiResult?.advice,
+      bodyArea,
+    });
+
     res.status(201).json({
       success: true,
       analysis: { analysisId: analysis.analysis_id, sessionId: session.session_id, imageId: image.image_id, timestamp: analysis.analysis_timestamp },
@@ -154,6 +170,7 @@ router.post('/analyze/upload', upload.single('image'), async (req: Request, res:
       baseline: baseline ? { spotCount: baseline.baseline_spot_count, textureScore: Number(baseline.baseline_texture_score.toFixed(3)), pigmentation: Number(baseline.baseline_pigmentation.toFixed(3)) } : null,
       recommendation: { status: recommendation.status, advice: recommendation.advice, recommendationId: rec.recommendation_id },
       ...(aiResult && { uvDamage: { damageScore: aiResult.damage_score, level: aiResult.level, advice: aiResult.advice } }),
+      ...(geminiRecommendation && { geminiRecommendation }),
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -267,7 +284,24 @@ router.post('/analyze', async (req: Request, res: Response) => {
     const aiResult = await sendToAIEngine(userId, features);
     if (aiResult) console.log(`  ✓ RF damage score: ${aiResult.damage_score} (${aiResult.level})`);
 
-    // STEP 10: Return full result
+    // STEP 10: Gemini AI personalized recommendation
+    const geminiRecommendation = await getGeminiRecommendation({
+      features,
+      baseline: baseline ? {
+        spotCount: baseline.baseline_spot_count,
+        textureScore: baseline.baseline_texture_score,
+        averagePigmentation: baseline.baseline_pigmentation,
+      } : null,
+      ruleStatus: recommendation.status,
+      ruleAdvice: recommendation.advice,
+      damageScore: aiResult?.damage_score,
+      damageLevel: aiResult?.level,
+      damageAdvice: aiResult?.advice,
+      bodyArea,
+    });
+    if (geminiRecommendation) console.log(`  ✓ Gemini recommendation generated`);
+
+    // STEP 11: Return full result
     res.status(201).json({
       success: true,
       analysis: {
@@ -293,6 +327,7 @@ router.post('/analyze', async (req: Request, res: Response) => {
         recommendationId: rec.recommendation_id
       },
       ...(aiResult && { uvDamage: { damageScore: aiResult.damage_score, level: aiResult.level, advice: aiResult.advice } }),
+      ...(geminiRecommendation && { geminiRecommendation }),
     });
 
   } catch (error: any) {

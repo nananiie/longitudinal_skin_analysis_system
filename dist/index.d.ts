@@ -4,6 +4,7 @@
  *
  * @file index.ts
  */
+import 'dotenv/config';
 import { AnalysisDatabase } from './services/database.service.js';
 export declare const getApp: (database: AnalysisDatabase) => import("express-serve-static-core").Express;
 export declare const getDb: () => AnalysisDatabase;
