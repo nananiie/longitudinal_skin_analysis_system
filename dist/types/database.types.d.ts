@@ -14,6 +14,7 @@ export interface User {
     updated_at: string;
     device_identifier: string;
     device_type: 'desktop' | 'android' | 'web';
+    display_name?: string;
     sync_version: number;
 }
 /**

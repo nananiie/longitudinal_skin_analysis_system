@@ -34,6 +34,11 @@ export class AnalysisDatabase {
             // Execute schema - use exec() for multiple statements
             this.db.exec(schema);
             console.log('✓ Database schema initialized successfully');
+            // Migration: add display_name to users if it doesn't exist yet
+            try {
+                this.db.exec('ALTER TABLE users ADD COLUMN display_name TEXT');
+            }
+            catch { /* column already exists — safe to ignore */ }
         }
         catch (error) {
             throw new Error(`Failed to initialize database schema: ${error}`);
@@ -61,22 +66,27 @@ export class AnalysisDatabase {
     /**
      * Create or get user
      */
-    createUser(deviceIdentifier, deviceType) {
+    createUser(deviceIdentifier, deviceType, displayName) {
         const userId = uuidv4();
         const now = new Date().toISOString();
         const stmt = this.db.prepare(`
-      INSERT INTO users (user_id, device_identifier, device_type, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?)
+      INSERT INTO users (user_id, device_identifier, device_type, display_name, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
-        stmt.run(userId, deviceIdentifier, deviceType, now, now);
+        stmt.run(userId, deviceIdentifier, deviceType, displayName ?? null, now, now);
         return {
             user_id: userId,
             created_at: now,
             updated_at: now,
             device_identifier: deviceIdentifier,
             device_type: deviceType,
+            display_name: displayName,
             sync_version: 1
         };
+    }
+    updateUserDisplayName(userId, displayName) {
+        const stmt = this.db.prepare('UPDATE users SET display_name = ?, updated_at = ? WHERE user_id = ?');
+        stmt.run(displayName, new Date().toISOString(), userId);
     }
     /**
      * Get user by device identifier
@@ -152,6 +162,19 @@ export class AnalysisDatabase {
     getSessionImages(sessionId) {
         const stmt = this.db.prepare('SELECT * FROM images WHERE session_id = ? ORDER BY created_at');
         return stmt.all(sessionId);
+    }
+    /**
+     * Get the most recent image for a user+bodyArea (used to surface previous scan for comparison)
+     */
+    getPreviousImageForBodyArea(userId, bodyArea) {
+        const stmt = this.db.prepare(`
+      SELECT i.* FROM images i
+      JOIN analysis_sessions s ON i.session_id = s.session_id
+      WHERE i.user_id = ? AND s.body_area = ?
+      ORDER BY s.session_date DESC
+      LIMIT 1
+    `);
+        return stmt.get(userId, bodyArea);
     }
     // =========================================================================
     // FEATURE ANALYSIS

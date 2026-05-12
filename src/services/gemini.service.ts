@@ -1,5 +1,12 @@
 import Groq from 'groq-sdk';
 
+export interface UserSunProfile {
+  sunExposure?: string;       // e.g. "Less than 30 minutes"
+  sunscreenUse?: string;      // e.g. "Once a day"
+  outdoorFrequency?: string;  // e.g. "3 days a week"
+  lastSunburn?: string;       // e.g. "A week ago"
+}
+
 export interface GeminiContext {
   features: {
     spotCount: number;
@@ -17,6 +24,7 @@ export interface GeminiContext {
   damageLevel?: string;
   damageAdvice?: string;
   bodyArea?: string;
+  userProfile?: UserSunProfile;
 }
 
 let groq: Groq | null = null;
@@ -28,7 +36,7 @@ function getClient(): Groq | null {
 }
 
 function buildPrompt(ctx: GeminiContext): string {
-  const { features, baseline, ruleStatus, ruleAdvice, damageScore, damageLevel, damageAdvice, bodyArea } = ctx;
+  const { features, baseline, ruleStatus, ruleAdvice, damageScore, damageLevel, damageAdvice, bodyArea, userProfile } = ctx;
 
   const baselineSection = baseline
     ? `Longitudinal comparison (vs first scan):
@@ -39,6 +47,14 @@ function buildPrompt(ctx: GeminiContext): string {
 
   const damageSection = damageScore !== undefined && damageLevel
     ? `UV damage assessment: ${damageLevel} (score ${damageScore.toFixed(2)}/1.00)`
+    : '';
+
+  const profileSection = userProfile && (userProfile.sunExposure || userProfile.sunscreenUse || userProfile.outdoorFrequency || userProfile.lastSunburn)
+    ? `User sun & lifestyle profile:
+${userProfile.sunExposure ? `- Daily sun exposure: ${userProfile.sunExposure}` : ''}
+${userProfile.sunscreenUse ? `- Sunscreen use: ${userProfile.sunscreenUse}` : ''}
+${userProfile.outdoorFrequency ? `- Goes outdoors: ${userProfile.outdoorFrequency}` : ''}
+${userProfile.lastSunburn ? `- Last sunburn: ${userProfile.lastSunburn}` : ''}`.trim()
     : '';
 
   return `You are a skincare AI advisor. Your job is to take the outputs of a rule-based skin analysis system and produce a single, cohesive, personalized recommendation for the user. Blend all the rule outputs together — do not just repeat them. Be concise (3–4 sentences, under 100 words), friendly, and actionable. Do NOT diagnose.
@@ -57,9 +73,9 @@ Rule-based advice: ${ruleAdvice}
 
 ${damageSection}
 ${damageAdvice ? `Knowledge base advice: ${damageAdvice}` : ''}
-
+${profileSection ? `\n${profileSection}` : ''}
 === YOUR TASK ===
-Using all the above context, write a single personalized recommendation that blends the longitudinal trend, the UV damage level, and the rule-based findings into one clear, actionable message for this user.`;
+Using all the above context — including the user's sun exposure habits — write a single personalized recommendation that blends the longitudinal trend, the UV damage level, the rule-based findings, and the user's lifestyle into one clear, actionable message for this user.`;
 }
 
 export async function getGeminiRecommendation(ctx: GeminiContext): Promise<string | null> {

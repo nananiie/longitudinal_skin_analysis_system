@@ -22,7 +22,8 @@ export declare class AnalysisDatabase {
     /**
      * Create or get user
      */
-    createUser(deviceIdentifier: string, deviceType: 'desktop' | 'android' | 'web'): User;
+    createUser(deviceIdentifier: string, deviceType: 'desktop' | 'android' | 'web', displayName?: string): User;
+    updateUserDisplayName(userId: string, displayName: string): void;
     /**
      * Get user by device identifier
      */
@@ -43,6 +44,10 @@ export declare class AnalysisDatabase {
      * Get images for session
      */
     getSessionImages(sessionId: string): ImageMetadata[];
+    /**
+     * Get the most recent image for a user+bodyArea (used to surface previous scan for comparison)
+     */
+    getPreviousImageForBodyArea(userId: string, bodyArea: string): ImageMetadata | undefined;
     /**
      * Store feature analysis results
      */

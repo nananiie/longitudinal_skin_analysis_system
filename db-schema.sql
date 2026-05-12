@@ -2,6 +2,7 @@ CREATE TABLE IF NOT EXISTS users (
   user_id           TEXT PRIMARY KEY,
   device_identifier TEXT NOT NULL UNIQUE,
   device_type       TEXT NOT NULL DEFAULT 'android',
+  display_name      TEXT,
   created_at        TEXT NOT NULL,
   updated_at        TEXT NOT NULL,
   sync_version      INTEGER NOT NULL DEFAULT 1

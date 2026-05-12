@@ -1,5 +1,6 @@
-// Otsu's method: finds the intensity threshold that maximises between-class variance
-function computeOtsuThreshold(buffer) {
+// Fixed threshold via Otsu's method: finds the single intensity value that
+// maximises between-class variance across the whole image.
+export function computeOtsuThreshold(buffer) {
     const histogram = new Int32Array(256);
     for (let i = 0; i < buffer.length; i++)
         histogram[buffer[i]]++;
@@ -26,6 +27,31 @@ function computeOtsuThreshold(buffer) {
     }
     return threshold;
 }
+// Adaptive thresholding: computes a local threshold per pixel based on the mean
+// of its surrounding block minus a constant C to account for lighting variation.
+// Adaptive Thresholding
+export function computeAdaptiveThreshold(buffer, width, height, blockSize = 101, C = 40) {
+    const thresholdMap = new Uint8Array(buffer.length);
+    const half = Math.floor(blockSize / 2);
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            let sum = 0;
+            let count = 0;
+            for (let dy = -half; dy <= half; dy++) {
+                for (let dx = -half; dx <= half; dx++) {
+                    const ny = y + dy;
+                    const nx = x + dx;
+                    if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                        sum += buffer[ny * width + nx];
+                        count++;
+                    }
+                }
+            }
+            thresholdMap[y * width + x] = Math.max(0, Math.round(sum / count) - C);
+        }
+    }
+    return thresholdMap;
+}
 // 8-neighbour Local Binary Pattern: encodes local texture as a binary code per pixel
 function computeLBPScore(buffer, width, height) {
     // Clockwise from right: E, SE, S, SW, W, NW, N, NE
@@ -47,8 +73,8 @@ function computeLBPScore(buffer, width, height) {
     return (lbpSum / pixelCount) / 255; // normalised to 0–1
 }
 export async function extractFeatures(buffer, width, height) {
-    // 1. Adaptive Thresholding via Otsu's method
-    const threshold = computeOtsuThreshold(buffer);
+    // 1. Adaptive Thresholding — local mean per pixel block
+    const thresholdMap = computeAdaptiveThreshold(buffer, width, height);
     // 2. Texture Analysis via 8-neighbour Local Binary Pattern
     const textureScore = computeLBPScore(buffer, width, height);
     // 3. Connected Components Labeling (CCL) via Depth-First Search
@@ -60,7 +86,7 @@ export async function extractFeatures(buffer, width, height) {
     for (let y = 0; y < height; y++) {
         for (let x = 0; x < width; x++) {
             const i = getIndex(x, y);
-            if (buffer[i] < threshold && visited[i] === 0) {
+            if (buffer[i] < thresholdMap[i] && visited[i] === 0) {
                 let currentBlobSize = 0;
                 const stack = [i];
                 visited[i] = 1;
@@ -79,7 +105,7 @@ export async function extractFeatures(buffer, width, height) {
                     for (const { nx, ny } of neighbors) {
                         if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
                             const nIdx = getIndex(nx, ny);
-                            if (buffer[nIdx] < threshold && visited[nIdx] === 0) {
+                            if (buffer[nIdx] < thresholdMap[nIdx] && visited[nIdx] === 0) {
                                 visited[nIdx] = 1;
                                 stack.push(nIdx);
                             }

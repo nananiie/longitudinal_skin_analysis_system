@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   device_identifier TEXT UNIQUE NOT NULL,
   device_type TEXT NOT NULL CHECK (device_type IN ('desktop', 'android', 'web')),
+  display_name TEXT,
   sync_version INTEGER DEFAULT 1
 );
 

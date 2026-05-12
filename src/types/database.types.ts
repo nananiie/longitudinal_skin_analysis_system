@@ -15,6 +15,7 @@ export interface User {
   updated_at: string;        // ISO 8601 datetime
   device_identifier: string; // Hardware ID for cross-device sync
   device_type: 'desktop' | 'android' | 'web';
+  display_name?: string;     // Human-readable name from profile
   sync_version: number;
 }
 

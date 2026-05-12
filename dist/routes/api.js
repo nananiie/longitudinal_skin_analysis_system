@@ -68,13 +68,32 @@ router.get('/users/:userId', (req, res) => {
  */
 router.post('/users', (req, res) => {
     try {
-        const { deviceIdentifier, deviceType } = req.body;
+        const { deviceIdentifier, deviceType, name } = req.body;
         const db = req.db;
         if (!deviceIdentifier) {
             return res.status(400).json({ error: 'deviceIdentifier required' });
         }
-        const user = db.createUser(deviceIdentifier, deviceType || 'desktop');
+        const user = db.createUser(deviceIdentifier, deviceType || 'desktop', name);
         res.status(201).json(user);
+    }
+    catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+/**
+ * PUT /api/users/:userId
+ * Update user display name
+ */
+router.put('/users/:userId', (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { name } = req.body;
+        const db = req.db;
+        if (!name || typeof name !== 'string') {
+            return res.status(400).json({ error: 'name required' });
+        }
+        db.updateUserDisplayName(userId, name.trim());
+        res.json({ success: true, userId, display_name: name.trim() });
     }
     catch (error) {
         res.status(500).json({ error: error.message });
@@ -90,7 +109,7 @@ router.post('/users', (req, res) => {
  */
 router.post('/analyze/upload', upload.single('image'), async (req, res) => {
     try {
-        const { userId, bodyArea = 'forehead', lightingCondition = 'natural', notes } = req.body;
+        const { userId, bodyArea = 'forehead', lightingCondition = 'natural', notes, sunExposure, sunscreenUse, outdoorFrequency, lastSunburn } = req.body;
         const db = req.db;
         if (!userId)
             return res.status(400).json({ error: 'userId required' });
@@ -102,6 +121,9 @@ router.post('/analyze/upload', upload.single('image'), async (req, res) => {
             fs.unlinkSync(imagePath);
             return res.status(400).json({ error: 'Image does not appear to be skin. Please retake the photo directly on the skin area.' });
         }
+        // Capture previous image BEFORE creating the new record
+        const previousImage = db.getPreviousImageForBodyArea(userId, bodyArea);
+        const previousImageUrl = previousImage ? `/uploads/${path.basename(previousImage.image_path)}` : null;
         // Reuse the full analysis pipeline
         const session = db.createSession(userId, bodyArea, lightingCondition, notes);
         const preprocessed = await preprocessImage(imagePath);
@@ -133,6 +155,7 @@ router.post('/analyze/upload', upload.single('image'), async (req, res) => {
             damageLevel: aiResult?.level,
             damageAdvice: aiResult?.advice,
             bodyArea,
+            userProfile: { sunExposure, sunscreenUse, outdoorFrequency, lastSunburn },
         });
         res.status(201).json({
             success: true,
@@ -140,6 +163,8 @@ router.post('/analyze/upload', upload.single('image'), async (req, res) => {
             features: { spotCount: features.spotCount, textureScore: Number(features.textureScore.toFixed(3)), pigmentation: Number(features.averagePigmentation.toFixed(3)) },
             baseline: baseline ? { spotCount: baseline.baseline_spot_count, textureScore: Number(baseline.baseline_texture_score.toFixed(3)), pigmentation: Number(baseline.baseline_pigmentation.toFixed(3)) } : null,
             recommendation: { status: recommendation.status, advice: recommendation.advice, recommendationId: rec.recommendation_id },
+            currentImageUrl: `/uploads/${path.basename(imagePath)}`,
+            previousImageUrl,
             ...(aiResult && { uvDamage: { damageScore: aiResult.damage_score, level: aiResult.level, advice: aiResult.advice } }),
             ...(geminiRecommendation && { geminiRecommendation }),
         });
@@ -161,7 +186,7 @@ router.post('/analyze/upload', upload.single('image'), async (req, res) => {
  */
 router.post('/analyze', async (req, res) => {
     try {
-        const { userId, imagePath, bodyArea = 'forehead', lightingCondition = 'natural', notes } = req.body;
+        const { userId, imagePath, bodyArea = 'forehead', lightingCondition = 'natural', notes, sunExposure, sunscreenUse, outdoorFrequency, lastSunburn } = req.body;
         const db = req.db;
         // Validation
         if (!userId || !imagePath) {
@@ -226,6 +251,7 @@ router.post('/analyze', async (req, res) => {
             damageLevel: aiResult?.level,
             damageAdvice: aiResult?.advice,
             bodyArea,
+            userProfile: { sunExposure, sunscreenUse, outdoorFrequency, lastSunburn },
         });
         if (geminiRecommendation)
             console.log(`  ✓ Gemini recommendation generated`);
