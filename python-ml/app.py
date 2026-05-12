@@ -12,7 +12,7 @@ init_db()
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, 'rf_model.pkl')
 SCALER_PATH = os.path.join(BASE_DIR, 'scaler.pkl')
-KB_PATH = os.path.join(BASE_DIR, '../src/modules/recommendation/knowledge_base.json')
+KB_PATH = os.environ.get('KB_PATH', os.path.join(BASE_DIR, 'knowledge_base.json'))
 
 with open(KB_PATH, 'r') as f:
     knowledge_base = json.load(f)

@@ -9,8 +9,10 @@ dist/
 node_modules/
 
 # Uploads and data
-uploads/
-data/
+uploads/*
+!uploads/.gitkeep
+data/*
+!data/.gitkeep
 
 # Python
 __pycache__/
