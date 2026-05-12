@@ -1,0 +1,29 @@
+{
+  "name": "longitudinal-skin-analysis-system",
+  "version": "1.0.0",
+  "description": "Longitudinal skin analysis system backend",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "dependencies": {
+    "better-sqlite3": "^9.4.3",
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "sharp": "^0.33.2",
+    "uuid": "^9.0.0",
+    "typescript": "^5.3.3",
+    "@types/better-sqlite3": "^7.6.8",
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/multer": "^1.4.11",
+    "@types/node": "^20.11.5",
+    "@types/uuid": "^9.0.7"
+  },
+  "devDependencies": {
+    "@react-native-community/cli": "^13.6.4"
+  }
+}
