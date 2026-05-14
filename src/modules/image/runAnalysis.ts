@@ -2,68 +2,55 @@
 import path from "path";
 import { preprocessImage } from "./preprocess.js";
 import { extractFeatures } from "./featureExtraction.js";
-import { generateRecommendation } from "../comparison/rules.js";
+
+
+function computeSkinScore(spotCount: number, textureScore: number, averagePigmentation: number): number {
+  return Math.min(100, Math.round(
+    ((100 - Math.min(textureScore * 100, 100))
+    + (100 - Math.min(averagePigmentation * 100, 100))
+    + (100 - Math.min(spotCount * 2, 100))) / 3
+  ));
+}
+
+function riskLabel(score: number): string {
+  if (score >= 70) return "Low";
+  if (score >= 40) return "Moderate";
+  return "High";
+}
 
 function sep(char = "═", len = 60) { console.log(char.repeat(len)); }
-function row(label: string, a: string | number, b: string | number, delta?: string) {
-  const l = label.padEnd(24);
-  const av = String(a).padStart(10);
-  const bv = String(b).padStart(10);
-  const d = delta ? `  ${delta}` : "";
-  console.log(`  ${l} ${av}   ${bv}${d}`);
-}
 
 async function analyze(imagePath: string) {
   const img = await preprocessImage(path.resolve(imagePath));
   return extractFeatures(img.buffer, img.width, img.height);
 }
 
-async function runComparison(firstPath: string, secondPath: string) {
-  const [first, second] = await Promise.all([analyze(firstPath), analyze(secondPath)]);
-  const rec = generateRecommendation(second, {
-    spotCount: first.spotCount,
-    textureScore: first.textureScore,
-    averagePigmentation: first.averagePigmentation,
-  });
+async function runAnalysis(paths: string[]) {
+  const results = await Promise.all(paths.map(analyze));
 
-  const spotDelta    = second.spotCount - first.spotCount;
-  const spotPct      = first.spotCount > 0 ? ((spotDelta / first.spotCount) * 100) : 0;
-  const textureDelta = second.textureScore - first.textureScore;
-  const pigDelta     = second.averagePigmentation - first.averagePigmentation;
+  for (let i = 0; i < paths.length; i++) {
+    const r = results[i];
+    const score = computeSkinScore(r.spotCount, r.textureScore, r.averagePigmentation);
+    const risk  = riskLabel(score);
 
-  sep();
-  console.log("  PixelDerm — Comparison Summary");
-  console.log(`  Scan 1 : ${path.basename(firstPath)}`);
-  console.log(`  Scan 2 : ${path.basename(secondPath)}`);
-  console.log(`  Date   : ${new Date().toLocaleString()}`);
-  sep();
-  console.log(`  ${"".padEnd(24)} ${"Scan 1".padStart(10)}   ${"Scan 2".padStart(10)}   ${"Change"}`);
-  console.log(`  ${"─".repeat(56)}`);
-  row("Spot Count (CCL)",
-    first.spotCount,
-    second.spotCount,
-    `${spotDelta >= 0 ? "+" : ""}${spotDelta} (${spotPct >= 0 ? "+" : ""}${spotPct.toFixed(1)}%)`
-  );
-  row("Texture Score (LBP)",
-    first.textureScore.toFixed(4),
-    second.textureScore.toFixed(4),
-    `${textureDelta >= 0 ? "+" : ""}${textureDelta.toFixed(4)}`
-  );
-  row("Pigmentation",
-    `${(first.averagePigmentation * 100).toFixed(2)}%`,
-    `${(second.averagePigmentation * 100).toFixed(2)}%`,
-    `${pigDelta >= 0 ? "+" : ""}${(pigDelta * 100).toFixed(2)}%`
-  );
-  sep();
-  console.log(`  Status : ${rec.status}`);
-  console.log(`  Advice : ${rec.advice}`);
-  sep();
-  console.log();
+    sep();
+    console.log(`  PixelDerm — Scan ${i + 1}`);
+    console.log(`  File : ${path.basename(paths[i])}`);
+    console.log(`  Date : ${new Date().toLocaleString()}`);
+    sep("─");
+    console.log(`  Spot Count (CCL)    : ${r.spotCount}`);
+    console.log(`  Texture Score (LBP) : ${(r.textureScore * 100).toFixed(2)}%`);
+    console.log(`  Pigmentation        : ${(r.averagePigmentation * 100).toFixed(2)}%`);
+    console.log(`  Skin Score          : ${score}%`);
+    console.log(`  Risk Level          : ${risk}`);
+    sep();
+    console.log();
+  }
 }
 
-const [first, second] = process.argv.slice(2);
-if (!first || !second) {
-  console.error("Usage: node runAnalysis.js <first-image> <second-image>");
+const paths = process.argv.slice(2);
+if (paths.length !== 3) {
+  console.error("Usage: node runAnalysis.js <image1> <image2> <image3>");
   process.exit(1);
 }
-runComparison(first, second).catch(err => { console.error("Error:", err.message); process.exit(1); });
+runAnalysis(paths).catch(err => { console.error("Error:", err.message); process.exit(1); });

@@ -1,6 +1,6 @@
 export async function sendToAIEngine(userId, features) {
     try {
-        const API_URL = 'http://127.0.0.1:8000/analyze';
+        const API_URL = process.env.ML_SERVICE_URL ?? 'http://127.0.0.1:8000/analyze';
         const payload = {
             userId: userId,
             spotCount: features.spotCount,
