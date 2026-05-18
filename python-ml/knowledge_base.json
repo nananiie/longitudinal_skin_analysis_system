@@ -1,0 +1,24 @@
+{
+  "recommendations": [
+    {
+      "max_score": 0.20,
+      "level": "Minimal",
+      "advice": "Your skin shows minimal UV damage. Continue your current sun protection routine and stay hydrated."
+    },
+    {
+      "max_score": 0.45,
+      "level": "Mild",
+      "advice": "Mild UV damage detected. Apply SPF 30+ daily, wear protective clothing, and avoid peak sun hours (10am–4pm)."
+    },
+    {
+      "max_score": 0.70,
+      "level": "Moderate",
+      "advice": "Moderate UV damage detected. Increase SPF to 50+, consider antioxidant serums (Vitamin C/E), and schedule a dermatologist check-up."
+    },
+    {
+      "max_score": 1.00,
+      "level": "Severe",
+      "advice": "Significant UV damage detected. Please consult a dermatologist for a professional skin examination as soon as possible."
+    }
+  ]
+}

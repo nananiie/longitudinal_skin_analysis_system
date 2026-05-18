@@ -1,0 +1,26 @@
+# Environment secrets
+.env
+.env.local
+
+# Build output
+dist/
+
+# Dependencies
+node_modules/
+
+# Uploads and data
+uploads/*
+!uploads/.gitkeep
+data/*
+!data/.gitkeep
+
+# Python
+__pycache__/
+*.pyc
+python-ml/__pycache__/
+
+# IDE
+.idea/
+.vscode/
+*.suo
+*.user

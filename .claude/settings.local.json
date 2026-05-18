@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c ' *)",
+      "WebFetch(domain:www.dermatologyjournal.com)",
+      "WebFetch(domain:www.ncbi.nlm.nih.gov)",
+      "Bash(python train_model.py)",
+      "Bash(node -e ' *)"
+    ]
+  }
+}
