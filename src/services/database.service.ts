@@ -62,6 +62,9 @@ export class AnalysisDatabase {
       try {
         this.db.exec('ALTER TABLE users ADD COLUMN display_name TEXT');
       } catch { /* column already exists — safe to ignore */ }
+      try {
+        this.db.exec('ALTER TABLE users ADD COLUMN pin TEXT');
+      } catch { /* column already exists — safe to ignore */ }
     } catch (error) {
       throw new Error(`Failed to initialize database schema: ${error}`);
     }
@@ -93,16 +96,16 @@ export class AnalysisDatabase {
   /**
    * Create or get user
    */
-  public createUser(deviceIdentifier: string, deviceType: 'desktop' | 'android' | 'web', displayName?: string): User {
+  public createUser(deviceIdentifier: string, deviceType: 'desktop' | 'android' | 'web', displayName?: string, pin?: string): User {
     const userId = uuidv4();
     const now = new Date().toISOString();
 
     const stmt = this.db.prepare(`
-      INSERT INTO users (user_id, device_identifier, device_type, display_name, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO users (user_id, device_identifier, device_type, display_name, pin, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
 
-    stmt.run(userId, deviceIdentifier, deviceType, displayName ?? null, now, now);
+    stmt.run(userId, deviceIdentifier, deviceType, displayName ?? null, pin ?? null, now, now);
 
     return {
       user_id: userId,
@@ -118,6 +121,11 @@ export class AnalysisDatabase {
   public updateUserDisplayName(userId: string, displayName: string): void {
     const stmt = this.db.prepare('UPDATE users SET display_name = ?, updated_at = ? WHERE user_id = ?');
     stmt.run(displayName, new Date().toISOString(), userId);
+  }
+
+  public updateUserPin(userId: string, pin: string): void {
+    const stmt = this.db.prepare('UPDATE users SET pin = ?, updated_at = ? WHERE user_id = ?');
+    stmt.run(pin, new Date().toISOString(), userId);
   }
 
   /**

@@ -85,14 +85,14 @@ router.get('/users/:userId', (req: Request, res: Response) => {
  */
 router.post('/users', (req: Request, res: Response) => {
   try {
-    const { deviceIdentifier, deviceType, name } = req.body;
+    const { deviceIdentifier, deviceType, name, pin } = req.body;
     const db = req.db!;
 
     if (!deviceIdentifier) {
       return res.status(400).json({ error: 'deviceIdentifier required' });
     }
 
-    const user = db.createUser(deviceIdentifier, deviceType || 'desktop', name);
+    const user = db.createUser(deviceIdentifier, deviceType || 'desktop', name, pin);
     res.status(201).json(user);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -106,15 +106,16 @@ router.post('/users', (req: Request, res: Response) => {
 router.put('/users/:userId', (req: Request, res: Response) => {
   try {
     const { userId } = req.params;
-    const { name } = req.body;
+    const { name, pin } = req.body;
     const db = req.db!;
 
-    if (!name || typeof name !== 'string') {
-      return res.status(400).json({ error: 'name required' });
+    if (!name && !pin) {
+      return res.status(400).json({ error: 'name or pin required' });
     }
 
-    db.updateUserDisplayName(userId, name.trim());
-    res.json({ success: true, userId, display_name: name.trim() });
+    if (name && typeof name === 'string') db.updateUserDisplayName(userId, name.trim());
+    if (pin && typeof pin === 'string') db.updateUserPin(userId, pin);
+    res.json({ success: true, userId, display_name: name?.trim() ?? null });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
