@@ -1,33 +1,5 @@
 import { FeatureResults } from "../../types/image";
 
-// Fixed threshold via Otsu's method: finds the single intensity value that
-// maximises between-class variance across the whole image.
-export function computeOtsuThreshold(buffer: Buffer): number {
-    const histogram = new Int32Array(256);
-    for (let i = 0; i < buffer.length; i++) histogram[buffer[i]]++;
-
-    const total = buffer.length;
-    let sum = 0;
-    for (let i = 0; i < 256; i++) sum += i * histogram[i];
-
-    let sumB = 0, wB = 0, maxVariance = 0, threshold = 0;
-    for (let t = 0; t < 256; t++) {
-        wB += histogram[t];
-        if (wB === 0) continue;
-        const wF = total - wB;
-        if (wF === 0) break;
-        sumB += t * histogram[t];
-        const mB = sumB / wB;
-        const mF = (sum - sumB) / wF;
-        const variance = wB * wF * (mB - mF) ** 2;
-        if (variance > maxVariance) { maxVariance = variance; threshold = t; }
-    }
-    return threshold;
-}
-
-// Adaptive thresholding: computes a local threshold per pixel based on the mean
-// of its surrounding block minus a constant C to account for lighting variation.
-
 // Adaptive Thresholding
 export function computeAdaptiveThreshold(buffer: Buffer, width: number, height: number, blockSize = 101, C = 40): Uint8Array {
     const thresholdMap = new Uint8Array(buffer.length);
@@ -55,7 +27,6 @@ export function computeAdaptiveThreshold(buffer: Buffer, width: number, height: 
 
 // 8-neighbour Local Binary Pattern: encodes local texture as a binary code per pixel
 function computeLBPScore(buffer: Buffer, width: number, height: number): number {
-    // Clockwise from right: E, SE, S, SW, W, NW, N, NE
     const offsets = [[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1],[0,-1],[1,-1]];
     let lbpSum = 0;
     const pixelCount = (width - 2) * (height - 2);
