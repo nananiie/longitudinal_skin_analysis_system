@@ -1,5 +1,30 @@
 import { FeatureResults } from "../../types/image";
 
+// Fixed threshold via Otsu's method: finds the single intensity value that
+// maximises between-class variance across the whole image.
+export function computeOtsuThreshold(buffer: Buffer): number {
+    const histogram = new Int32Array(256);
+    for (let i = 0; i < buffer.length; i++) histogram[buffer[i]]++;
+
+    const total = buffer.length;
+    let sum = 0;
+    for (let i = 0; i < 256; i++) sum += i * histogram[i];
+
+    let sumB = 0, wB = 0, maxVariance = 0, threshold = 0;
+    for (let t = 0; t < 256; t++) {
+        wB += histogram[t];
+        if (wB === 0) continue;
+        const wF = total - wB;
+        if (wF === 0) break;
+        sumB += t * histogram[t];
+        const mB = sumB / wB;
+        const mF = (sum - sumB) / wF;
+        const variance = wB * wF * (mB - mF) ** 2;
+        if (variance > maxVariance) { maxVariance = variance; threshold = t; }
+    }
+    return threshold;
+}
+
 // Adaptive Thresholding
 export function computeAdaptiveThreshold(buffer: Buffer, width: number, height: number, blockSize = 101, C = 40): Uint8Array {
     const thresholdMap = new Uint8Array(buffer.length);
