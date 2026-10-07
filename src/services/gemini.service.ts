@@ -57,7 +57,7 @@ ${userProfile.outdoorFrequency ? `- Goes outdoors: ${userProfile.outdoorFrequenc
 ${userProfile.lastSunburn ? `- Last sunburn: ${userProfile.lastSunburn}` : ''}`.trim()
     : '';
 
-  return `You are a skincare AI advisor. Your job is to take the outputs of a rule-based skin analysis system and produce a single, cohesive, personalized recommendation for the user. Blend all the rule outputs together — do not just repeat them. Be concise (3–4 sentences, under 100 words), friendly, and actionable. Do NOT diagnose.
+  return `You are a skincare AI advisor. Your job is to take the outputs of a rule-based skin analysis system and produce a single, cohesive, personalized recommendation for the user. Blend all the rule outputs together — do not just repeat them. Be concise (3–4 sentences, under 100 words), friendly, and actionable. Do NOT diagnose. Reply in plain text only — no headings, titles, bullet points, or markdown formatting.
 
 === ANALYSIS RESULTS FOR: ${bodyArea || 'skin'} ===
 
@@ -84,9 +84,10 @@ export async function getGeminiRecommendation(ctx: GeminiContext): Promise<strin
 
   try {
     const completion = await client.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
+      model: 'openai/gpt-oss-20b',
+      reasoning_effort: 'low',
       messages: [{ role: 'user', content: buildPrompt(ctx) }],
-      max_tokens: 150,
+      max_tokens: 300,
       temperature: 0.7,
     });
     return completion.choices[0]?.message?.content?.trim() ?? null;
